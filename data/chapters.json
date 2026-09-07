@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "name": "Quy định chung và quy tắc giao thông đường bộ",
+    "category": "rules",
+    "fromQuestion": 1,
+    "toQuestion": 166,
+    "totalQuestions": 166
+  },
+  {
+    "id": 2,
+    "name": "Văn hóa, đạo đức người lái xe và phòng chống tác hại của rượu, bia",
+    "category": "culture",
+    "fromQuestion": 167,
+    "toQuestion": 192,
+    "totalQuestions": 26
+  },
+  {
+    "id": 3,
+    "name": "Kỹ thuật lái xe ô tô",
+    "category": "drivingTechnique",
+    "fromQuestion": 193,
+    "toQuestion": 248,
+    "totalQuestions": 56
+  },
+  {
+    "id": 4,
+    "name": "Cấu tạo và sửa chữa thông thường xe ô tô",
+    "category": "structureRepair",
+    "fromQuestion": 249,
+    "toQuestion": 283,
+    "totalQuestions": 35
+  },
+  {
+    "id": 5,
+    "name": "Hệ thống biển báo hiệu đường bộ",
+    "category": "signs",
+    "fromQuestion": 284,
+    "toQuestion": 485,
+    "totalQuestions": 202
+  },
+  {
+    "id": 6,
+    "name": "Giải các thế sa hình và kỹ năng xử lý tình huống giao thông",
+    "category": "scenario",
+    "fromQuestion": 486,
+    "toQuestion": 600,
+    "totalQuestions": 115
+  }
+]

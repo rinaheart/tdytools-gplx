@@ -1,0 +1,86 @@
+[
+  {
+    "id": "B_2025_TRANSITION",
+    "status": "active",
+    "licenseClass": "B",
+    "title": "Hạng B — Hiện hành (Chuyển tiếp đến 28/02/2027)",
+    "questionBankVersionId": "QB_600_2025",
+    "criticalSetId": "CRITICAL_60_2025",
+    "effectiveFrom": "2025-06-01",
+    "effectiveUntil": "2027-02-28",
+    "questionCount": 30,
+    "durationMinutes": 20,
+    "passingScore": 27,
+    "criticalQuestionCount": 1,
+    "criticalMistakeFails": true,
+    "blueprint": [
+      {
+        "id": "B_CRITICAL",
+        "pool": {
+          "type": "critical",
+          "criticalSetId": "CRITICAL_60_2025"
+        },
+        "questionCount": 1
+      },
+      {
+        "id": "B_RULES",
+        "pool": {
+          "type": "category",
+          "category": "rules"
+        },
+        "questionCount": 8
+      },
+      {
+        "id": "B_CULTURE",
+        "pool": {
+          "type": "category",
+          "category": "culture"
+        },
+        "questionCount": 1
+      },
+      {
+        "id": "B_TECHNIQUE",
+        "pool": {
+          "type": "category",
+          "category": "drivingTechnique"
+        },
+        "questionCount": 1
+      },
+      {
+        "id": "B_REPAIR",
+        "pool": {
+          "type": "category",
+          "category": "structureRepair"
+        },
+        "questionCount": 1
+      },
+      {
+        "id": "B_SIGNS",
+        "pool": {
+          "type": "category",
+          "category": "signs"
+        },
+        "questionCount": 9
+      },
+      {
+        "id": "B_SCENARIOS",
+        "pool": {
+          "type": "category",
+          "category": "scenario"
+        },
+        "questionCount": 9
+      }
+    ]
+  },
+  {
+    "id": "B_2027_PLACEHOLDER",
+    "status": "placeholder",
+    "licenseClass": "B",
+    "title": "Hạng B — Theo Thông tư 108 (Áp dụng từ 01/03/2027)",
+    "questionBankVersionId": "QB_2027_PENDING",
+    "effectiveFrom": "2027-03-01",
+    "questionCount": 50,
+    "durationMinutes": 33,
+    "passingScore": 45
+  }
+]

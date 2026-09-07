@@ -1,0 +1,35 @@
+{
+  "id": "q-600",
+  "questionNumber": 600,
+  "chapterId": 6,
+  "chapterName": "Giải các thế sa hình và kỹ năng xử lý tình huống giao thông",
+  "category": "scenario",
+  "content": "Trong tình huống dưới đây, xe đầu kéo kéo rơ moóc (xe container) đang rẽ phải, xe con màu xanh và xe máy phía sau xe container đi như thế nào để bảo đảm an toàn?",
+  "contentHash": "3a4ec17a1a3d0c03361a5c55c09561e82a154d6c759ebb982d59771ce8358e4f",
+  "options": [
+    {
+      "id": 1,
+      "text": "Vượt về phía bên phải để đi tiếp.",
+      "isCorrect": false
+    },
+    {
+      "id": 2,
+      "text": "Giảm tốc độ chờ xe container rẽ xong rồi tiếp tục đi.",
+      "isCorrect": true
+    },
+    {
+      "id": 3,
+      "text": "Vượt về phía bên trái để đi tiếp.",
+      "isCorrect": false
+    }
+  ],
+  "isCritical": false,
+  "source": {
+    "document": "DOC_600_PDF_2025",
+    "page": 188
+  },
+  "image": {
+    "src": "q-600.png",
+    "type": "scenario"
+  }
+}

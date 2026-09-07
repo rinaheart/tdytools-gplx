@@ -1,0 +1,35 @@
+{
+  "id": "q-486",
+  "questionNumber": 486,
+  "chapterId": 6,
+  "chapterName": "Giải các thế sa hình và kỹ năng xử lý tình huống giao thông",
+  "category": "scenario",
+  "content": "Theo hướng mũi tên, xe nào chấp hành đúng quy tắc giao thông?",
+  "contentHash": "639337ebd26832cc406fd00eba60eeab75212dde4dc422b830efe7f2704111de",
+  "options": [
+    {
+      "id": 1,
+      "text": "Xe khách, xe tải, xe mô tô.",
+      "isCorrect": false
+    },
+    {
+      "id": 2,
+      "text": "Xe tải, xe mô tô.",
+      "isCorrect": false
+    },
+    {
+      "id": 3,
+      "text": "Chỉ xe con.",
+      "isCorrect": true
+    }
+  ],
+  "isCritical": false,
+  "source": {
+    "document": "DOC_600_PDF_2025",
+    "page": 131
+  },
+  "image": {
+    "src": "q-486.png",
+    "type": "scenario"
+  }
+}

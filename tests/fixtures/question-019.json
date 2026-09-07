@@ -1,0 +1,32 @@
+{
+  "id": "q-19",
+  "questionNumber": 19,
+  "chapterId": 1,
+  "chapterName": "Quy định chung và quy tắc giao thông đường bộ",
+  "category": "rules",
+  "content": "Hành vi nào dưới đây bị nghiêm cấm?",
+  "contentHash": "cd95cb1e1ba60243e01f9a5c410f0ce6975ee551bb81608f31b79b4134a16128",
+  "options": [
+    {
+      "id": 1,
+      "text": "Sử dụng xe đạp đi trên các tuyến quốc lộ.",
+      "isCorrect": false
+    },
+    {
+      "id": 2,
+      "text": "Rải vật sắc nhọn, đổ chất gây trơn trượt trên đường bộ.",
+      "isCorrect": true
+    },
+    {
+      "id": 3,
+      "text": "Cả hai ý trên.",
+      "isCorrect": false
+    }
+  ],
+  "isCritical": true,
+  "source": {
+    "document": "DOC_600_PDF_2025",
+    "page": 8
+  },
+  "criticalSetId": "CRITICAL_60_2025"
+}

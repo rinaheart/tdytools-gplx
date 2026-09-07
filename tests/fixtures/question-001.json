@@ -1,0 +1,31 @@
+{
+  "id": "q-1",
+  "questionNumber": 1,
+  "chapterId": 1,
+  "chapterName": "Quy định chung và quy tắc giao thông đường bộ",
+  "category": "rules",
+  "content": "Phần của đường bộ được sử dụng cho phương tiện giao thông đường bộ đi lại là gì?",
+  "contentHash": "f154bb3248e687132e6c916327dc32c9d8c33ff05389715830b51eecb51c5894",
+  "options": [
+    {
+      "id": 1,
+      "text": "Phần mặt đường và lề đường.",
+      "isCorrect": false
+    },
+    {
+      "id": 2,
+      "text": "Phần đường xe chạy.",
+      "isCorrect": true
+    },
+    {
+      "id": 3,
+      "text": "Phần đường xe cơ giới.",
+      "isCorrect": false
+    }
+  ],
+  "isCritical": false,
+  "source": {
+    "document": "DOC_600_PDF_2025",
+    "page": 5
+  }
+}

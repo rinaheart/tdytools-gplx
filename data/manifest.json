@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "MANIFEST_GPLX_B_2026",
+  "updatedAt": "2026-09-07T23:30:00Z",
+  "documents": [
+    {
+      "id": "DOC_600_PDF_2025",
+      "type": "official_question_book",
+      "title": "600 câu hỏi dùng cho sát hạch lái xe cơ giới đường bộ",
+      "authority": "Cục Cảnh sát giao thông — Bộ Công an",
+      "year": 2025,
+      "filePath": "assets/600-cau-hoi-sat-hach.pdf"
+    },
+    {
+      "id": "DOC_CV_2262_2025",
+      "type": "official_guidance",
+      "number": "2262/CSGT-P5",
+      "date": "2025-05-07",
+      "authority": "Cục Cảnh sát giao thông — Bộ Công an",
+      "filePath": "assets/2071319603_Hướng dẫn sử dụng bộ câu hỏi sát hạch GPLX (CV 2262.07.5.2025).pdf"
+    },
+    {
+      "id": "DOC_TT_108_2026",
+      "type": "official_circular",
+      "number": "108/2026/TT-BCA",
+      "date": "2026-06-29",
+      "authority": "Bộ Công an",
+      "effectiveFrom": "2026-07-01",
+      "theoryExamEffectiveFrom": "2027-03-01",
+      "filePath": "assets/thong-tu-so-108-2026.pdf"
+    }
+  ],
+  "questionBanks": [
+    {
+      "id": "QB_600_2025",
+      "title": "Bộ 600 câu hỏi Cục CSGT 2025",
+      "sourceDocumentId": "DOC_600_PDF_2025",
+      "regulatoryDocumentId": "DOC_CV_2262_2025",
+      "sourceDate": "2025-05-07",
+      "effectiveFrom": "2025-06-01",
+      "totalQuestions": 600,
+      "totalImages": 295,
+      "status": "active"
+    },
+    {
+      "id": "QB_2027_PENDING",
+      "title": "Bộ câu hỏi sát hạch mới theo Thông tư 108/2026/TT-BCA",
+      "regulatoryDocumentId": "DOC_TT_108_2026",
+      "effectiveFrom": "2027-03-01",
+      "status": "pending_issuance"
+    }
+  ],
+  "criticalSets": [
+    {
+      "id": "CRITICAL_60_2025",
+      "title": "60 câu hỏi xử lý tình huống mất ATGT nghiêm trọng",
+      "sourceDocumentId": "DOC_CV_2262_2025",
+      "appendix": "III",
+      "totalCount": 60,
+      "questionNumbers": [
+        19, 20, 21, 22, 23, 24, 25, 26, 27, 28,
+        30, 32, 34, 35, 47, 48, 52, 53, 55, 58,
+        63, 64, 65, 66, 67, 68, 70, 71, 72, 73,
+        74, 85, 86, 87, 88, 89, 90, 91, 92, 93,
+        97, 98, 102, 117, 163, 165, 167, 197, 198, 206,
+        215, 226, 234, 245, 246, 252, 253, 254, 255, 260
+      ]
+    }
+  ],
+  "examProfiles": [
+    {
+      "id": "B_2025_TRANSITION",
+      "status": "active",
+      "licenseClass": "B",
+      "title": "Hạng B — Hiện hành (Chuyển tiếp đến 28/02/2027)",
+      "questionBankVersionId": "QB_600_2025",
+      "criticalSetId": "CRITICAL_60_2025",
+      "effectiveFrom": "2025-06-01",
+      "effectiveUntil": "2027-02-28",
+      "questionCount": 30,
+      "durationMinutes": 20,
+      "passingScore": 27,
+      "criticalQuestionCount": 1,
+      "criticalMistakeFails": true,
+      "blueprint": [
+        {
+          "id": "B_CRITICAL",
+          "pool": {
+            "type": "critical",
+            "criticalSetId": "CRITICAL_60_2025"
+          },
+          "questionCount": 1
+        },
+        {
+          "id": "B_RULES",
+          "pool": {
+            "type": "category",
+            "category": "rules"
+          },
+          "questionCount": 8
+        },
+        {
+          "id": "B_CULTURE",
+          "pool": {
+            "type": "category",
+            "category": "culture"
+          },
+          "questionCount": 1
+        },
+        {
+          "id": "B_TECHNIQUE",
+          "pool": {
+            "type": "category",
+            "category": "drivingTechnique"
+          },
+          "questionCount": 1
+        },
+        {
+          "id": "B_REPAIR",
+          "pool": {
+            "type": "category",
+            "category": "structureRepair"
+          },
+          "questionCount": 1
+        },
+        {
+          "id": "B_SIGNS",
+          "pool": {
+            "type": "category",
+            "category": "signs"
+          },
+          "questionCount": 9
+        },
+        {
+          "id": "B_SCENARIOS",
+          "pool": {
+            "type": "category",
+            "category": "scenario"
+          },
+          "questionCount": 9
+        }
+      ]
+    },
+    {
+      "id": "B_2027_PLACEHOLDER",
+      "status": "placeholder",
+      "licenseClass": "B",
+      "title": "Hạng B — Theo Thông tư 108 (Áp dụng từ 01/03/2027)",
+      "questionBankVersionId": "QB_2027_PENDING",
+      "effectiveFrom": "2027-03-01",
+      "questionCount": 50,
+      "durationMinutes": 33,
+      "passingScore": 45
+    }
+  ],
+  "fixedTrainingExams": {
+    "profileId": "B_2025_TRANSITION",
+    "totalExams": 18,
+    "seedBase": 10001,
+    "description": "18 đề luyện chuẩn sinh từ blueprint và hạt giống cố định 10001-10018 phục vụ ôn tập theo mốc"
+  },
+  "learningRoadmap": {
+    "stages": [
+      {
+        "step": 1,
+        "id": "critical-foundation",
+        "title": "60 câu điểm liệt",
+        "target": "60/60 mastered, 0 lỗi điểm liệt gần đây",
+        "isRecommendedFirst": true
+      },
+      {
+        "step": 2,
+        "id": "bank-foundation",
+        "title": "Học 600 câu",
+        "target": "Attempted >= 90%, Mastered >= 80%"
+      },
+      {
+        "step": 3,
+        "id": "topic-reinforcement",
+        "title": "Luyện theo 6 chủ đề/chương",
+        "target": "Mỗi chủ đề đạt tỷ lệ đúng >= 80%"
+      },
+      {
+        "step": 4,
+        "id": "fixed-exams",
+        "title": "18 đề luyện chuẩn",
+        "target": "Hoàn thành 18 đề luyện chuẩn fixed seed"
+      },
+      {
+        "step": 5,
+        "id": "random-exams",
+        "title": "Thi thử ngẫu nhiên",
+        "target": "Đạt chuỗi 5 đề liên tiếp không sai câu điểm liệt"
+      },
+      {
+        "step": 6,
+        "id": "full-scan",
+        "title": "Quét 600 câu (Scan 600)",
+        "target": "Rà soát toàn bộ 600 câu, lọc danh sách câu yếu đưa vào Smart Review"
+      },
+      {
+        "step": 7,
+        "id": "speed-training",
+        "title": "Luyện tốc độ (Speed Mode)",
+        "target": "Làm nhanh hơn mà giữ nguyên độ chính xác >= 28/30"
+      }
+    ]
+  }
+}

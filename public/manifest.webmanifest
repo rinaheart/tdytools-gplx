@@ -1,0 +1,17 @@
+{
+  "name": "Luyện Thi GPLX Hạng B — 600 Câu Sát Hạch",
+  "short_name": "GPLX B",
+  "description": "Ứng dụng luyện thi sát hạch lý thuyết lái xe ô tô Hạng B chuẩn 600 câu Cục CSGT",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

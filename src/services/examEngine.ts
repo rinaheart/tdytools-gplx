@@ -40,23 +40,24 @@ export function shuffleArray<T>(array: T[], rng: () => number): T[] {
   return result;
 }
 
-export function resolveExamProfile(
-  licenseClass: 'B',
-  targetDate: string,
-  profiles: ExamProfile[]
-): ExamProfile {
-  const match = profiles.find(p => {
-    if (p.licenseClass !== licenseClass) return false;
-    if (p.status === 'placeholder' || p.status === 'deprecated') return false;
-    const afterStart = p.effectiveFrom <= targetDate;
-    const beforeEnd = !p.effectiveUntil || targetDate <= p.effectiveUntil;
-    return afterStart && beforeEnd;
-  });
-
-  if (!match) {
-    throw new Error(`Không tìm thấy hồ sơ sát hạch hợp lệ cho hạng ${licenseClass} tại ngày ${targetDate}`);
+/**
+ * Xác định số thứ tự Đề mẫu chuẩn (1..18), tương thích ngược với bản ghi cũ của khách hàng chỉ lưu trong title.
+ */
+export function getFixedExamNumber(record: Pick<ExamRecord, 'fixedExamNumber' | 'title'>): number | null {
+  if (typeof record.fixedExamNumber === 'number' && record.fixedExamNumber >= 1 && record.fixedExamNumber <= 18) {
+    return record.fixedExamNumber;
   }
-  return match;
+  const match = record.title?.match(/Đề luyện chuẩn số (\d+)\/18/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
+/**
+ * Xác định bài thi ngẫu nhiên độc lập (loại trừ 18 đề mẫu cố định và các bài thi nằm trong phiên Cram 120).
+ */
+export function isStandardRandomExam(record: ExamRecord): boolean {
+  if (record.mode === 'cram-120') return false;
+  if (record.examType === 'fixed') return false;
+  return getFixedExamNumber(record) === null;
 }
 
 export function generateExam(
@@ -72,7 +73,7 @@ export function generateExam(
   const selectedIds = new Set<string>();
   const examQuestionIds: string[] = [];
 
-  // P0.2: Rút slot critical trước và bắt buộc match criticalSetId
+  // Rút slot critical trước và bắt buộc khớp criticalSetId
   for (const slot of profile.blueprint) {
     if (slot.pool.type === 'critical') {
       const requiredSetId = slot.pool.criticalSetId;
@@ -90,7 +91,7 @@ export function generateExam(
     }
   }
 
-  // P0.1: Rút các slot category (loại trừ toàn bộ câu điểm liệt để đảm bảo đúng 1 câu điểm liệt duy nhất)
+  // Rút các slot category (loại trừ toàn bộ câu điểm liệt để đảm bảo đúng 1 câu điểm liệt duy nhất)
   for (const slot of profile.blueprint) {
     if (slot.pool.type === 'category') {
       const targetCategory = slot.pool.category;
@@ -108,12 +109,11 @@ export function generateExam(
     }
   }
 
-  // Trộn toàn bộ đề bằng RNG đã inject
   return shuffleArray(examQuestionIds, rng);
 }
 
 export function generateFixedTrainingExam(
-  examNumber: number, // 1 -> 18
+  examNumber: number,
   profile: ExamProfile,
   allQuestions: Question[]
 ): string[] {
@@ -148,10 +148,10 @@ export function evaluateExam(
     if (isAnswered && correctOption && selectedOptionId === correctOption.id) {
       isCorrect = true;
       correctCount++;
+    } else if (isAnswered) {
+      incorrectCount++;
     } else {
-      isCorrect = false;
-      if (isAnswered) incorrectCount++;
-      else unansweredCount++;
+      unansweredCount++;
     }
 
     if (q.isCritical) {
@@ -169,7 +169,6 @@ export function evaluateExam(
   }
 
   const score = correctCount;
-  // Quy tắc 2 tầng: Đạt điểm tối thiểu VÀ không sai câu điểm liệt
   const passed = score >= profile.passingScore && !hasCriticalMistake;
 
   const startedTime = new Date(session.startedAt).getTime();
@@ -189,6 +188,7 @@ export function evaluateExam(
     id: session.examId,
     profileId: profile.id,
     title: session.title,
+    fixedExamNumber: session.fixedExamNumber,
     questionBankVersionId: profile.questionBankVersionId,
     profileSnapshot,
     questionIds: session.questionIds,
@@ -207,10 +207,6 @@ export function evaluateExam(
     criticalQuestionId,
     answers: answersRecord
   };
-}
-
-export async function saveExamRecord(record: ExamRecord): Promise<void> {
-  await db.examHistory.put(record);
 }
 
 export async function saveActiveSession(session: ActiveExamSession): Promise<void> {

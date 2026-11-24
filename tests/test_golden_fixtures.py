@@ -1,7 +1,9 @@
 import json
 import sys
+import os
 
 sys.stdout.reconfigure(encoding='utf-8')
+os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 print("=== KIỂM THỬ SNAPSHOT GOLDEN FIXTURES ===")
 

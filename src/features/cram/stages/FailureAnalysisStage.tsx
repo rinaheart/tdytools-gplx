@@ -11,7 +11,7 @@ import {
 interface FailureAnalysisStageProps {
   examRecord: ExamRecord;
   questions: Question[];
-  onProceedToSprint: (weakCategories: string[]) => void;
+  onProceedToSprint: (weakCategories: Question['category'][]) => void;
 }
 
 export const FailureAnalysisStage: React.FC<FailureAnalysisStageProps> = ({

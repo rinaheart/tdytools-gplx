@@ -53,7 +53,6 @@ export function updateProgressOnAnswer(
 
   if (isCorrect) {
     const consecutiveCorrect = prev.consecutiveCorrect + 1;
-    const consecutiveIncorrect = 0;
     const status: QuestionStatus = consecutiveCorrect >= 2 ? 'mastered' : 'learning';
 
     return {
@@ -62,37 +61,25 @@ export function updateProgressOnAnswer(
       correctCount,
       incorrectCount,
       consecutiveCorrect,
-      consecutiveIncorrect,
+      consecutiveIncorrect: 0,
       status,
       firstAttemptAt,
       lastAttemptAt: nowIso,
       lastCorrectAt: nowIso
     };
-  } else {
-    // Làm sai: reset chuỗi đúng và chuyển ngay về trạng thái 'review'
-    return {
-      ...prev,
-      attempts,
-      correctCount,
-      incorrectCount,
-      consecutiveCorrect: 0,
-      consecutiveIncorrect: prev.consecutiveIncorrect + 1,
-      status: 'review',
-      firstAttemptAt,
-      lastAttemptAt: nowIso
-    };
   }
-}
 
-export async function recordQuestionAnswer(
-  questionId: string,
-  isCorrect: boolean
-): Promise<UserProgressItem> {
-  const existing = await db.progress.get(questionId);
-  const base = existing || createDefaultProgress(questionId);
-  const updated = updateProgressOnAnswer(base, isCorrect);
-  await db.progress.put(updated);
-  return updated;
+  return {
+    ...prev,
+    attempts,
+    correctCount,
+    incorrectCount,
+    consecutiveCorrect: 0,
+    consecutiveIncorrect: prev.consecutiveIncorrect + 1,
+    status: 'review',
+    firstAttemptAt,
+    lastAttemptAt: nowIso
+  };
 }
 
 export async function toggleBookmark(questionId: string): Promise<boolean> {
@@ -104,21 +91,25 @@ export async function toggleBookmark(questionId: string): Promise<boolean> {
 }
 
 /**
- * Lấy danh sách động các câu cần ôn (Dynamic Review View):
- * - Câu điểm liệt chưa đạt mastered (tránh rủi ro trượt)
- * - Câu đang ở trạng thái 'review'
- * - Câu có số lần làm sai liên tiếp > 0
+ * Danh sách động các câu cần ôn (Single Source of Truth cho Sidebar, Dashboard, ReviewQueueView & Cram):
+ * - Mặc định (includeUnseenCritical = false): Các câu người học đã làm nhưng đang sai ('review'),
+ *   có chuỗi sai liên tiếp > 0, hoặc câu điểm liệt đã làm nhưng chưa đạt 'mastered'.
+ * - Khi includeUnseenCritical = true: Bổ sung cả các câu điểm liệt chưa từng làm.
  */
 export function getQuestionsNeedingReview(
   questions: Question[],
-  progressMap: Map<string, UserProgressItem>
+  progressMap: Map<string, UserProgressItem>,
+  includeUnseenCritical: boolean = false
 ): Question[] {
   return questions.filter(q => {
     const p = progressMap.get(q.id);
+    if (!p || p.attempts === 0) {
+      return includeUnseenCritical && q.isCritical;
+    }
     return (
-      (q.isCritical && p?.status !== 'mastered') ||
-      p?.status === 'review' ||
-      (p?.consecutiveIncorrect || 0) > 0
+      p.status === 'review' ||
+      p.consecutiveIncorrect > 0 ||
+      (q.isCritical && p.status !== 'mastered')
     );
   });
 }
@@ -143,7 +134,6 @@ export function calculateReviewPriorityScore(
 
   if (progress.consecutiveIncorrect >= 2) score += weights.repeatedMistakes;
 
-  // Điểm cộng theo thời gian chưa ôn lại (quá 3 ngày +10 điểm, quá 7 ngày +20 điểm)
   if (progress.lastAttemptAt) {
     const daysSince = (new Date(nowIso).getTime() - new Date(progress.lastAttemptAt).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSince > 7) score += 20;
@@ -173,24 +163,20 @@ export function calculateReadinessMetrics(
     ? totalMasteredCount / allQuestions.length
     : 0;
 
-  // Lấy tối đa 5 bài thi gần nhất
   const last5Exams = [...examHistory]
     .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
     .slice(0, 5);
 
   const examPassCount = last5Exams.filter(e => e.passed).length;
   const examPassRateLast5 = last5Exams.length > 0 ? examPassCount / last5Exams.length : 0;
-
   const recentCriticalMistakes = last5Exams.filter(e => e.hasCriticalMistake).length;
 
-  // Trọng số: 40% Điểm liệt an toàn + 40% Kết quả thi thử + 20% Tỷ lệ thành thạo ngân hàng câu hỏi
   let score = Math.round(
     criticalMasteryRate * 40 +
     examPassRateLast5 * 40 +
     bankMasteryRate * 20
   );
 
-  // Phạt nặng nếu trong 5 đề gần nhất có đề sai câu điểm liệt
   if (recentCriticalMistakes > 0) {
     score = Math.min(score, 75);
   }
@@ -225,7 +211,6 @@ export function resolveNextBestAction(
     q => progressMap.get(q.id)?.status !== 'mastered'
   );
 
-  // 1. Nếu còn câu điểm liệt chưa thành thạo -> Ưu tiên tuyệt đối số 1
   if (criticalUnmastered.length > 0) {
     return {
       stage: 'critical-foundation',
@@ -237,11 +222,10 @@ export function resolveNextBestAction(
     };
   }
 
-  // 2. Nếu ngân hàng câu hỏi chưa học được 80%
   const attemptedCount = allQuestions.filter(
     q => (progressMap.get(q.id)?.attempts || 0) > 0
   ).length;
-  if (attemptedCount < 480) { // < 80% của 600 câu
+  if (attemptedCount < 480) {
     return {
       stage: 'bank-foundation',
       stageTitle: 'Bước 2: Nắm Vững 600 Câu',
@@ -252,10 +236,7 @@ export function resolveNextBestAction(
     };
   }
 
-  // 3. Có câu đang ở trạng thái review cần ôn tập
-  const reviewCount = allQuestions.filter(
-    q => progressMap.get(q.id)?.status === 'review'
-  ).length;
+  const reviewCount = getQuestionsNeedingReview(allQuestions, progressMap).length;
   if (reviewCount >= 10) {
     return {
       stage: 'topic-reinforcement',
@@ -266,7 +247,6 @@ export function resolveNextBestAction(
     };
   }
 
-  // 4. Nếu chưa hoàn thành đủ 18 đề luyện chuẩn cố định
   if (fixedExamsCompletedCount < 18) {
     return {
       stage: 'fixed-exams',
@@ -277,7 +257,6 @@ export function resolveNextBestAction(
     };
   }
 
-  // 5. Kiểm tra chuỗi thi ngẫu nhiên (yêu cầu streak 5 đề liên tiếp đạt)
   const last5 = [...examHistory]
     .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
     .slice(0, 5);
@@ -294,7 +273,6 @@ export function resolveNextBestAction(
     };
   }
 
-  // 6. Sẵn sàng cao -> Speed Mode
   return {
     stage: 'speed-training',
     stageTitle: 'Bước 6: Luyện Tốc Độ & Giữ Vững Phong Độ',

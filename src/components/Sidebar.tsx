@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { getQuestionsNeedingReview } from '../services/learningEngine';
 import {
   Award,
   BookOpen,
@@ -28,7 +29,7 @@ export const Sidebar: React.FC = () => {
 
   const reviewCount = React.useMemo(() => {
     if (!questions || !progressMap) return 0;
-    return questions.filter(q => progressMap.get(q.id)?.status === 'review').length;
+    return getQuestionsNeedingReview(questions, progressMap).length;
   }, [questions, progressMap]);
 
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
@@ -44,7 +45,7 @@ export const Sidebar: React.FC = () => {
       const next = !prev;
       try {
         localStorage.setItem('gplx_sidebar_collapsed', String(next));
-      } catch {}
+      } catch { }
       return next;
     });
   };
@@ -75,9 +76,8 @@ export const Sidebar: React.FC = () => {
       ───────────────────────────────────────────────────────────── */}
       <aside
         aria-label="Thanh điều hướng bên trái"
-        className={`hidden md:flex flex-col justify-between sticky top-0 h-screen bg-white dark:bg-[#090d16] border-r border-slate-200 dark:border-slate-800 transition-all duration-200 z-30 select-none flex-shrink-0 ${
-          isCollapsed ? 'w-18' : 'w-56 lg:w-60'
-        }`}
+        className={`hidden md:flex flex-col justify-between sticky top-0 h-screen bg-white dark:bg-[#090d16] border-r border-slate-200 dark:border-slate-800 transition-all duration-200 z-30 select-none flex-shrink-0 ${isCollapsed ? 'w-18' : 'w-56 lg:w-60'
+          }`}
       >
         {/* Top Header & Brand */}
         <div>
@@ -138,13 +138,11 @@ export const Sidebar: React.FC = () => {
                   onClick={() => setView(id)}
                   aria-current={isActive ? 'page' : undefined}
                   title={isCollapsed ? label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                    isCollapsed ? 'justify-center' : 'justify-start'
-                  } ${
-                    isActive
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isCollapsed ? 'justify-center' : 'justify-start'
+                    } ${isActive
                       ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold border border-blue-200/50 dark:border-blue-500/30 shadow-sm'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-slate-800/60'
-                  }`}
+                    }`}
                 >
                   <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-600 dark:text-blue-400' : ''}`} aria-hidden="true" />
                   {!isCollapsed && <span className="truncate flex-1 text-left">{label}</span>}
@@ -167,9 +165,8 @@ export const Sidebar: React.FC = () => {
               type="button"
               onClick={resumeExamSession}
               title={`Đang thi dở: ${activeSession.title}`}
-              className={`w-full mb-2 bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 rounded-xl p-2 flex items-center gap-2 hover:bg-amber-500/25 transition text-left ${
-                isCollapsed ? 'justify-center' : ''
-              }`}
+              className={`w-full mb-2 bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-300 rounded-xl p-2 flex items-center gap-2 hover:bg-amber-500/25 transition text-left ${isCollapsed ? 'justify-center' : ''
+                }`}
             >
               <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75"></span>
@@ -189,9 +186,8 @@ export const Sidebar: React.FC = () => {
             type="button"
             onClick={toggleDarkMode}
             title={darkMode ? 'Chuyển sang giao diện Sáng' : 'Chuyển sang giao diện Tối'}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition ${
-              isCollapsed ? 'justify-center' : 'justify-start'
-            }`}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition ${isCollapsed ? 'justify-center' : 'justify-start'
+              }`}
           >
             {darkMode ? (
               <Sun className="w-4 h-4 text-amber-400 flex-shrink-0" aria-hidden="true" />
@@ -207,13 +203,11 @@ export const Sidebar: React.FC = () => {
             onClick={() => setView('settings')}
             title="Cài đặt & Sao lưu"
             aria-current={currentView === 'settings' ? 'page' : undefined}
-            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-              isCollapsed ? 'justify-center' : 'justify-start'
-            } ${
-              currentView === 'settings'
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition ${isCollapsed ? 'justify-center' : 'justify-start'
+              } ${currentView === 'settings'
                 ? 'bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
-            }`}
+              }`}
           >
             <Settings className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
             {!isCollapsed && <span>Cài đặt & Sao lưu</span>}
@@ -281,29 +275,26 @@ export const Sidebar: React.FC = () => {
               type="button"
               onClick={() => setView(id)}
               aria-current={isActive ? 'page' : undefined}
-              className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-xl transition-all duration-200 relative group active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-                isActive
+              className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-xl transition-all duration-200 relative group active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${isActive
                   ? 'bg-blue-600 text-white shadow-md shadow-blue-600/35 font-bold scale-[1.02]'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100/60 dark:hover:bg-slate-800/50'
-              }`}
+                }`}
             >
               {/* Icon Container with Badge */}
               <div className="relative flex items-center justify-center">
                 <Icon
-                  className={`w-5 h-5 mb-0.5 transition-transform duration-200 ${
-                    isActive ? 'scale-105 stroke-[2.2]' : 'stroke-[1.8] group-hover:scale-105'
-                  }`}
+                  className={`w-5 h-5 mb-0.5 transition-transform duration-200 ${isActive ? 'scale-105 stroke-[2.2]' : 'stroke-[1.8] group-hover:scale-105'
+                    }`}
                   aria-hidden="true"
                 />
 
                 {/* Review Queue Badge */}
                 {hasReviewItems && (
                   <span
-                    className={`absolute -top-1 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-extrabold flex items-center justify-center leading-none shadow-sm ${
-                      isActive
+                    className={`absolute -top-1 -right-2.5 min-w-[15px] h-[15px] px-1 rounded-full text-[9px] font-mono font-extrabold flex items-center justify-center leading-none shadow-sm ${isActive
                         ? 'bg-white text-rose-600'
                         : 'bg-rose-500 text-white'
-                    }`}
+                      }`}
                     title={`${reviewCount} câu cần ôn lại`}
                   >
                     {reviewCount > 99 ? '99+' : reviewCount}
@@ -321,9 +312,8 @@ export const Sidebar: React.FC = () => {
 
               {/* Label */}
               <span
-                className={`text-[10px] tracking-tight leading-none ${
-                  isActive ? 'text-white font-bold' : 'font-medium'
-                }`}
+                className={`text-[10px] tracking-tight leading-none ${isActive ? 'text-white font-bold' : 'font-medium'
+                  }`}
               >
                 {label}
               </span>

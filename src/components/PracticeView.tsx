@@ -64,23 +64,18 @@ export const PracticeView: React.FC = () => {
     });
   };
 
-  // Filter questions according to current filter state
   const filteredQuestions = useMemo(() => {
     return questions.filter(q => {
-      // Filter by chapter
       if (practiceFilter.chapterId && q.chapterId !== practiceFilter.chapterId) {
         return false;
       }
-      // Filter by critical
       if (practiceFilter.criticalOnly && !q.isCritical) {
         return false;
       }
-      // Filter by bookmarked
       if (practiceFilter.bookmarkedOnly) {
         const prog = progressMap.get(q.id);
         if (!prog || !prog.isBookmarked) return false;
       }
-      // Filter by status
       if (practiceFilter.status && practiceFilter.status !== 'all') {
         const prog = progressMap.get(q.id);
         const currentStatus = prog ? prog.status : 'unseen';
@@ -90,24 +85,27 @@ export const PracticeView: React.FC = () => {
     });
   }, [questions, practiceFilter, progressMap]);
 
-  // Clamp current index
   const safeIndex = Math.min(Math.max(0, currentIndex), Math.max(0, filteredQuestions.length - 1));
   const currentQuestion = filteredQuestions[safeIndex];
   const currentProgress = currentQuestion ? progressMap.get(currentQuestion.id) : undefined;
 
-  // Selected option state for current question
   const [selectedOptions, setSelectedOptions] = useState<Record<string, number>>({});
 
   const handleSelectOption = (optId: number) => {
     if (!currentQuestion) return;
+    // Chống click đúp cùng một phương án làm cộng dồn sai lệch consecutiveCorrect
+    if (selectedOptions[currentQuestion.id] === optId) return;
+
+    const alreadyAnsweredInView = selectedOptions[currentQuestion.id] !== undefined;
     setSelectedOptions(prev => ({
       ...prev,
       [currentQuestion.id]: optId
     }));
 
-    const correctOpt = currentQuestion.options.find(o => o.isCorrect);
-    const isCorrect = correctOpt?.id === optId;
-    answerQuestion(currentQuestion.id, isCorrect);
+    // Chỉ ghi nhận attempt lần đầu trả lời câu này trong lượt xem hiện tại
+    if (!alreadyAnsweredInView) {
+      answerQuestion(currentQuestion.id, optId, { mode: 'practice' });
+    }
   };
 
   const handleNext = () => {
@@ -122,7 +120,6 @@ export const PracticeView: React.FC = () => {
     }
   };
 
-  // Keyboard navigation support (ArrowLeft / ArrowRight)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
@@ -138,10 +135,9 @@ export const PracticeView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-3 sm:space-y-5 pb-16 sm:pb-20 animate-fade-in">
-      {/* 1. Filter Toolbar (Collapsible / Thu gọn - Mở rộng để tập trung vào câu hỏi) */}
+      {/* 1. Filter Toolbar */}
       <div className="bg-white dark:bg-[#121826] rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm transition-all overflow-hidden">
         {isFilterCollapsed ? (
-          /* Trạng thái Thu gọn: Thanh công cụ 1 dòng siêu mỏng (~38px), nhường 100% mắt nhìn cho câu hỏi */
           <div className="p-2 sm:px-4 sm:py-2.5 flex items-center justify-between gap-2 animate-fade-in">
             <div className="flex items-center gap-1.5 min-w-0">
               <button
@@ -224,15 +220,14 @@ export const PracticeView: React.FC = () => {
             </div>
           </div>
         ) : (
-          /* Trạng thái Mở rộng: Cấu trúc 3 hàng tinh gọn, vuốt ngang mượt mà, không cắt chữ */
           <div className="p-3 sm:p-4 space-y-2.5 animate-fade-in">
-            {/* Hàng 1: Chapter Tabs cuộn ngang mượt mà, có shrink-0 chống vỡ chữ */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar scroll-smooth">
               <button
                 type="button"
                 aria-pressed={practiceFilter.chapterId === undefined}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, chapterId: undefined }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
@@ -250,6 +245,7 @@ export const PracticeView: React.FC = () => {
                   aria-pressed={practiceFilter.chapterId === ch.id}
                   onClick={() => {
                     setPracticeFilter(prev => ({ ...prev, chapterId: ch.id }));
+                    setSelectedOptions({});
                     setCurrentIndex(0);
                   }}
                   className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
@@ -263,13 +259,13 @@ export const PracticeView: React.FC = () => {
               ))}
             </div>
 
-            {/* Hàng 2: Status Filter Pills cuộn ngang mượt mà */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar scroll-smooth">
               <button
                 type="button"
                 aria-pressed={!practiceFilter.criticalOnly && !practiceFilter.bookmarkedOnly && practiceFilter.status === 'all'}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, criticalOnly: false, bookmarkedOnly: false, status: 'all' }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white ${
@@ -285,6 +281,7 @@ export const PracticeView: React.FC = () => {
                 aria-pressed={practiceFilter.criticalOnly}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, criticalOnly: true, bookmarkedOnly: false, status: 'all' }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
@@ -301,6 +298,7 @@ export const PracticeView: React.FC = () => {
                 aria-pressed={practiceFilter.bookmarkedOnly}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, criticalOnly: false, bookmarkedOnly: true, status: 'all' }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap flex items-center gap-1.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
@@ -317,6 +315,7 @@ export const PracticeView: React.FC = () => {
                 aria-pressed={practiceFilter.status === 'review'}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, criticalOnly: false, bookmarkedOnly: false, status: 'review' }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${
@@ -332,6 +331,7 @@ export const PracticeView: React.FC = () => {
                 aria-pressed={practiceFilter.status === 'unseen'}
                 onClick={() => {
                   setPracticeFilter(prev => ({ ...prev, criticalOnly: false, bookmarkedOnly: false, status: 'unseen' }));
+                  setSelectedOptions({});
                   setCurrentIndex(0);
                 }}
                 className={`shrink-0 px-3 py-1.5 rounded-xl font-bold whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
@@ -344,7 +344,6 @@ export const PracticeView: React.FC = () => {
               </button>
             </div>
 
-            {/* Hàng 3: Action Toolbar (Học nhanh, Mục lục, Thu gọn) - Luôn cùng 1 hàng */}
             <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
@@ -377,7 +376,6 @@ export const PracticeView: React.FC = () => {
                 </button>
               </div>
 
-              {/* Nút Thu gọn luôn nằm sát mép phải */}
               <button
                 type="button"
                 aria-expanded={true}
@@ -393,7 +391,7 @@ export const PracticeView: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Grid Drawer Modal / Question Picker */}
+      {/* 2. Grid Drawer Modal */}
       {showGridDrawer && (
         <div
           role="dialog"
@@ -470,7 +468,6 @@ export const PracticeView: React.FC = () => {
             showImmediateAnswer={showImmediateAnswer}
           />
 
-          {/* Navigation Controls (Thumb-friendly touch targets) */}
           <div className="flex items-center justify-between gap-2 sm:gap-3 pt-1 sm:pt-2">
             <button
               type="button"
@@ -514,4 +511,3 @@ export const PracticeView: React.FC = () => {
     </div>
   );
 };
-

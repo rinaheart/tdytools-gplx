@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { useApp } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -10,7 +10,10 @@ import { FixedExamsView } from './components/FixedExamsView';
 import { ExamRoomView } from './components/ExamRoomView';
 import { SearchView } from './components/SearchView';
 import { SettingsView } from './components/SettingsView';
-import { Cram120Container } from './features/cram/Cram120Container';
+
+const Cram120Container = lazy(() =>
+  import('./features/cram/Cram120Container').then(m => ({ default: m.Cram120Container }))
+);
 
 export const AppContent: React.FC = () => {
   const {
@@ -31,7 +34,6 @@ export const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-app)] text-[var(--text-main)] transition-colors duration-200">
-      {/* Accessibility Skip Link */}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 z-50 px-4 py-2.5 bg-blue-600 text-white font-bold rounded-2xl shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
@@ -39,12 +41,9 @@ export const AppContent: React.FC = () => {
         Bỏ qua đến nội dung chính
       </a>
 
-      {/* Modern Responsive Sidebar (Ẩn khi đang trong chế độ Cram để người dùng tập trung 100%) */}
       {currentView !== 'cram' && <Sidebar />}
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
-        {/* Active Session Alert Banner */}
         {activeSession && currentView !== 'exam' && currentView !== 'cram' && (
           <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 px-4 py-2 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-2 truncate">
@@ -92,17 +91,25 @@ export const AppContent: React.FC = () => {
           {currentView === 'search' && <SearchView />}
           {currentView === 'settings' && <SettingsView />}
           {currentView === 'cram' && cramSession && (
-            <Cram120Container
-              session={cramSession}
-              questions={questions}
-              profile={profile}
-              examHistory={examHistory}
-              progressMap={progressMap}
-              onRecordAnswer={answerQuestion}
-              onExitCram={exitCram}
-              onUpdateSession={updateCramSession}
-              onOpenReview={() => setView('review')}
-            />
+            <Suspense
+              fallback={
+                <div className="p-12 text-center text-sm font-semibold text-slate-500">
+                  Đang mở lộ trình Cấp tốc 120 phút...
+                </div>
+              }
+            >
+              <Cram120Container
+                session={cramSession}
+                questions={questions}
+                profile={profile}
+                examHistory={examHistory}
+                progressMap={progressMap}
+                onRecordAnswer={answerQuestion}
+                onExitCram={exitCram}
+                onUpdateSession={updateCramSession}
+                onOpenReview={() => setView('review')}
+              />
+            </Suspense>
           )}
         </main>
       </div>

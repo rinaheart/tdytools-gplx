@@ -2,19 +2,29 @@
   "id": "q-301",
   "questionNumber": 301,
   "chapterId": 5,
-  "chapterName": "Hệ thống biển báo hiệu đường bộ",
+  "chapterName": "Báo hiệu đường bộ",
   "category": "signs",
   "content": "Biển nào cấm các loại xe cơ giới đi vào, trừ xe máy hai bánh, xe gắn máy và các loại xe ưu tiên theo quy định?",
-  "contentHash": "1e327efe29e143828727511d6699521f42158ea767aa17b90e111d639b1f3396",
+  "contentHash": "92caa4ab1e49e44d19a988d0280d7830b4ae76a4c44651e1059feac4c13f3baf",
   "options": [
     {
       "id": 1,
-      "text": "Biển 1.                                    3. Biển 1 và biển 3.",
+      "text": "Biển 1.",
       "isCorrect": true
     },
     {
       "id": 2,
-      "text": "Biển 2.                                    4. Cả ba biển.",
+      "text": "Biển 2.",
+      "isCorrect": false
+    },
+    {
+      "id": 3,
+      "text": "Biển 1 và biển 3.",
+      "isCorrect": false
+    },
+    {
+      "id": 4,
+      "text": "Cả ba biển.",
       "isCorrect": false
     }
   ],

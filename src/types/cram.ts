@@ -42,6 +42,15 @@ export interface CramBaseline {
   readinessScore?: number;
 }
 
+export interface CramActiveExamDraft {
+  examNumber: 1 | 2;
+  startedAt: string;
+  pausedAt?: string;
+  totalPausedSeconds: number;
+  answers: Record<string, number | undefined>;
+  currentIndex: number;
+}
+
 export interface CramSession {
   id: string;
   mode: 'cram-120';
@@ -49,15 +58,14 @@ export interface CramSession {
 
   status: CramSessionStatus;
   currentStage: CramStage;
+  stageCursor?: number;
 
   startedAt: string;
   deadlineAt: string;
   completedAt?: string;
 
-  // Baseline trước khi thực hiện attempt đầu tiên của phiên
   baseline?: CramBaseline;
 
-  // Hỗ trợ Tạm dừng theo yêu cầu của user
   isPaused: boolean;
   pausedAt?: string;
   totalPausedSeconds: number;
@@ -69,7 +77,6 @@ export interface CramSession {
   budget: CramBudget;
   stageStartedAt: string;
 
-  // Snapshot câu hỏi của từng phần
   triageAnsweredIds: string[];
   triageMistakeIds: string[];
 
@@ -85,18 +92,9 @@ export interface CramSession {
 
   finalCheckRemainingIds: string[];
 
-  readiness?: CramReadinessResult;
-}
+  activeCramExam?: CramActiveExamDraft;
 
-export interface CramQueueItem {
-  questionId: string;
-  reason:
-    | 'critical-mistake'
-    | 'repeated-mistake'
-    | 'low-accuracy'
-    | 'exam-mistake'
-    | 'unseen';
-  priority: number;
+  readiness?: CramReadinessResult;
 }
 
 export interface CategoryMistakeSummary {

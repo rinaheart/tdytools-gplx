@@ -11,8 +11,6 @@ export const SearchView: React.FC = () => {
   const [selectedChapter, setSelectedChapter] = useState<number | undefined>(undefined);
   const [criticalOnly, setCriticalOnly] = useState(false);
   const [hasImageOnly, setHasImageOnly] = useState(false);
-
-  // Selected answer map for practice within search
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, number>>({});
 
   const searchResults = useMemo(() => {
@@ -21,7 +19,6 @@ export const SearchView: React.FC = () => {
     const targetNum = isNum ? parseInt(qTrim, 10) : null;
 
     return questions.filter(q => {
-      // Direct question number search
       if (targetNum !== null) {
         if (q.questionNumber !== targetNum) return false;
       } else if (qTrim) {
@@ -40,7 +37,6 @@ export const SearchView: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-5 pb-24 animate-fade-in">
-      {/* Search Bar & Filter Header */}
       <div className="bg-white dark:bg-[#121826] p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
         <div className="relative">
           <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true" />
@@ -68,17 +64,15 @@ export const SearchView: React.FC = () => {
           )}
         </div>
 
-        {/* Filter Pills */}
         <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1 no-scrollbar">
           <button
             type="button"
             aria-pressed={criticalOnly}
             onClick={() => setCriticalOnly(prev => !prev)}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
-              criticalOnly
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${criticalOnly
                 ? 'bg-rose-600 text-white shadow-sm shadow-rose-500/25'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+              }`}
           >
             <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Chỉ 60 điểm liệt</span>
@@ -88,11 +82,10 @@ export const SearchView: React.FC = () => {
             type="button"
             aria-pressed={hasImageOnly}
             onClick={() => setHasImageOnly(prev => !prev)}
-            className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              hasImageOnly
+            className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold flex items-center gap-1.5 transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${hasImageOnly
                 ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
+              }`}
           >
             <Image className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Có hình ảnh</span>
@@ -104,11 +97,10 @@ export const SearchView: React.FC = () => {
               key={ch.id}
               aria-pressed={selectedChapter === ch.id}
               onClick={() => setSelectedChapter(prev => prev === ch.id ? undefined : ch.id)}
-              className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white ${
-                selectedChapter === ch.id
+              className={`min-h-[36px] px-3.5 py-1.5 rounded-xl font-bold whitespace-nowrap transition-all touch-target focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 dark:focus-visible:ring-white ${selectedChapter === ch.id
                   ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-sm'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
+                }`}
             >
               Chương {ch.id}
             </button>
@@ -116,12 +108,10 @@ export const SearchView: React.FC = () => {
         </div>
       </div>
 
-      {/* Results summary */}
       <div className="text-xs font-mono tabular-nums font-bold text-slate-500 dark:text-slate-400 px-2">
         Tìm thấy <strong className="text-slate-900 dark:text-white font-mono tabular-nums">{searchResults.length}</strong> kết quả phù hợp
       </div>
 
-      {/* Results List */}
       <div className="space-y-4">
         {searchResults.slice(0, 30).map(q => {
           const prog = progressMap.get(q.id);
@@ -134,9 +124,12 @@ export const SearchView: React.FC = () => {
               policy={PRACTICE_MODE_POLICY}
               selectedOptionId={currentOpt}
               onSelectOption={(optId) => {
+                if (selectedAnswers[q.id] === optId) return;
+                const firstTime = selectedAnswers[q.id] === undefined;
                 setSelectedAnswers(prev => ({ ...prev, [q.id]: optId }));
-                const correct = q.options.find(o => o.isCorrect);
-                answerQuestion(q.id, optId === correct?.id);
+                if (firstTime) {
+                  answerQuestion(q.id, optId, { mode: 'practice' });
+                }
               }}
               progress={prog}
               onToggleBookmark={() => toggleBookmark(q.id)}
@@ -161,4 +154,3 @@ export const SearchView: React.FC = () => {
     </div>
   );
 };
-

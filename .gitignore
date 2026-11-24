@@ -3,9 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
-# Production / Build
+# Production / Build / Publish Mirror
 dist/
 dist-ssr/
+tdytools-gplx_GH/
 *.local
 
 # Logs

@@ -60,7 +60,7 @@ export const SettingsView: React.FC = () => {
           <span>Sao lưu & Phục hồi dữ liệu (Backup / Restore)</span>
         </h3>
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-          Xuất toàn bộ tiến độ học, điểm thành thạo và lịch sử thi thử thành file JSON chuẩn (`schemaVersion: 1`). Bạn có thể mang sang thiết bị khác hoặc lưu trữ an toàn.
+          Xuất toàn bộ tiến độ học, điểm thành thạo và lịch sử thi thử thành file JSON chuẩn (hỗ trợ v2 và tương thích ngược v1). Bạn có thể mang sang thiết bị khác hoặc lưu trữ an toàn.
         </p>
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -121,7 +121,7 @@ export const SettingsView: React.FC = () => {
             </div>
             <div>• Ngân hàng câu hỏi: <strong>600 câu Cục Cảnh sát giao thông 2025</strong></div>
             <div>• Văn bản quy định: <strong>Công văn số 2262/CSGT-P5</strong> ngày 07/05/2025</div>
-            <div>• Cấu trúc đề: <strong>30 câu hỏi / 20 phút / Đạt $\ge$ 27/30</strong> và không sai câu điểm liệt</div>
+            <div>• Cấu trúc đề: <strong>30 câu hỏi / 20 phút / Đạt ≥ 27/30</strong> và không sai câu điểm liệt</div>
             <div>• Hiệu lực quy chế: Từ 01/06/2025 đến 28/02/2027</div>
           </div>
 
@@ -131,7 +131,7 @@ export const SettingsView: React.FC = () => {
             </div>
             <div>• Hiệu lực thi hành: 01/07/2026</div>
             <div>• Nội dung sát hạch mới đối với hạng B (50 câu/33 phút/45 điểm) <strong>chính thức áp dụng từ ngày 01/03/2027</strong></div>
-            <div>• Trạng thái hệ thống: Đã dự phòng sẵn hồ sơ `B_2027_PLACEHOLDER` (khóa tạo đề cho đến khi ban hành câu hỏi mới).</div>
+            <div>• Trạng thái hệ thống: Đã dự phòng sẵn hồ sơ <code className="font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-800 dark:text-slate-200">B_2027_PLACEHOLDER</code> (khóa tạo đề cho đến khi ban hành câu hỏi mới).</div>
           </div>
         </div>
       </div>

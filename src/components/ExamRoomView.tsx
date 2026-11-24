@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { FixedExamsView } from './FixedExamsView';
+import { getFixedExamNumber, isStandardRandomExam } from '../services/examEngine';
 import {
   Award,
   CheckCircle2,
@@ -20,14 +21,14 @@ export const ExamRoomView: React.FC = () => {
   // Trên mobile: Quản lý chọn mode: 'hub' (màn hình chọn), 'sample' (18 đề mẫu), 'random' (đề ngẫu nhiên)
   const [mobileSelection, setMobileSelection] = useState<'hub' | 'sample' | 'random'>('hub');
 
-  // Lịch sử các đề thi ngẫu nhiên
+  // Lịch sử các đề thi ngẫu nhiên độc lập (không lẫn đề mẫu cố định và đề Cram)
   const randomHistory = examHistory
-    .filter(r => !r.title.match(/Đề luyện chuẩn/))
+    .filter(isStandardRandomExam)
     .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
 
   // Đếm số đề mẫu đã hoàn thành
   const sampleCompletedCount = new Set(
-    examHistory.filter(e => e.title.startsWith('Đề luyện chuẩn')).map(e => e.title)
+    examHistory.map(e => getFixedExamNumber(e)).filter((n): n is number => n !== null)
   ).size;
 
   return (

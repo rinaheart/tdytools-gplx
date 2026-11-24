@@ -10,7 +10,8 @@ import type {
   QuestionStatus,
   BackupData,
   ActivityMode,
-  AttemptRecord
+  AttemptRecord,
+  CramSession
 } from '../types/quiz';
 import {
   toggleBookmark as dbToggleBookmark,
@@ -20,6 +21,7 @@ import {
 import {
   generateExam,
   generateFixedTrainingExam,
+  getFixedExamNumber,
   saveActiveSession,
   getActiveSession,
   clearActiveSession
@@ -33,10 +35,8 @@ import {
   loadActiveCramSession,
   saveCramSession
 } from '../services/cramEngine';
-import type { CramSession } from '../types/quiz';
 import { db } from '../db/dexie';
 
-// Import datasets
 import rawQuestions from '../../data/questions.json';
 import rawManifest from '../../data/manifest.json';
 import rawChapters from '../../data/chapters.json';
@@ -67,7 +67,7 @@ export interface AppContextType {
   progressMap: Map<string, UserProgressItem>;
   examHistory: ExamRecord[];
   activeSession: ActiveExamSession | null;
-  cramSession: import('../types/quiz').CramSession | null;
+  cramSession: CramSession | null;
   currentView: AppView;
   darkMode: boolean;
   practiceFilter: PracticeFilter;
@@ -75,13 +75,12 @@ export interface AppContextType {
   readiness: ReadinessMetrics;
   nextAction: NextBestAction;
 
-  // Actions
   setView: (view: AppView) => void;
   toggleDarkMode: () => void;
   setPracticeFilter: React.Dispatch<React.SetStateAction<PracticeFilter>>;
   answerQuestion: (
     questionId: string,
-    optionOrCorrect: number | boolean,
+    selectedOptionId: number,
     context?: { mode?: ActivityMode; sessionId?: string; examId?: string }
   ) => Promise<void>;
   toggleBookmark: (questionId: string) => Promise<void>;
@@ -94,7 +93,7 @@ export interface AppContextType {
   viewExamResult: (record: ExamRecord) => void;
   startCram: () => void;
   exitCram: () => void;
-  updateCramSession: (session: import('../types/quiz').CramSession) => void;
+  updateCramSession: (session: CramSession) => Promise<void>;
   resetAllProgress: () => Promise<void>;
   exportBackup: () => Promise<void>;
   importBackup: (jsonString: string) => Promise<{ success: boolean; message: string }>;
@@ -126,25 +125,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
   const [selectedExamResult, setSelectedExamResult] = useState<ExamRecord | null>(null);
 
-  // Load initial data from Dexie
+  const reloadGlobalStateFromDb = async () => {
+    const [allProgress, history] = await Promise.all([
+      db.progress.toArray(),
+      db.examHistory.toArray()
+    ]);
+    const pMap = new Map<string, UserProgressItem>();
+    for (const p of allProgress) {
+      pMap.set(p.questionId, p);
+    }
+    setProgressMap(pMap);
+    setExamHistory(history.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()));
+  };
+
   useEffect(() => {
     async function initDb() {
-      const allProgress = await db.progress.toArray();
-      const pMap = new Map<string, UserProgressItem>();
-      for (const p of allProgress) {
-        pMap.set(p.questionId, p);
-      }
-      setProgressMap(pMap);
-
-      const history = await db.examHistory.toArray();
-      setExamHistory(history.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()));
+      await reloadGlobalStateFromDb();
 
       const session = await getActiveSession();
       if (session && !session.isSubmitted) {
         setActiveSession(session);
       }
 
-      // Khôi phục phiên cấp tốc nếu có
       const activeCram = await loadActiveCramSession();
       if (activeCram && activeCram.status === 'active') {
         setCramSession(activeCram);
@@ -153,7 +155,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     initDb();
   }, []);
 
-  // Dark mode effect
   useEffect(() => {
     if (darkMode) {
       document.documentElement.classList.add('dark');
@@ -166,50 +167,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const toggleDarkMode = () => setDarkMode(prev => !prev);
 
-  // Computed metrics
   const readiness = useMemo(() => {
     return calculateReadinessMetrics(questions, progressMap, examHistory);
   }, [questions, progressMap, examHistory]);
 
   const fixedExamsCompletedCount = useMemo(() => {
-    const fixedTitles = new Set(examHistory.filter(e => e.title.startsWith('Đề luyện chuẩn')).map(e => e.title));
-    return fixedTitles.size;
+    const completedNums = new Set<number>();
+    for (const record of examHistory) {
+      const num = getFixedExamNumber(record);
+      if (num !== null) completedNums.add(num);
+    }
+    return completedNums.size;
   }, [examHistory]);
 
   const nextAction = useMemo(() => {
     return resolveNextBestAction(questions, progressMap, examHistory, fixedExamsCompletedCount);
   }, [questions, progressMap, examHistory, fixedExamsCompletedCount]);
 
-  // Answer question in Practice, Review, or Cram mode (Atomic attempt + reactive UI state patch)
   const handleAnswerQuestion = async (
     questionId: string,
-    optionOrCorrect: number | boolean,
+    selectedOptionId: number,
     context?: { mode?: ActivityMode; sessionId?: string; examId?: string }
   ) => {
-    let selectedOptionId: number;
-    let isCorrectHint: boolean | undefined;
-
-    if (typeof optionOrCorrect === 'boolean') {
-      isCorrectHint = optionOrCorrect;
-      const q = questions.find(item => item.id === questionId);
-      const correctOpt = q?.options.find(o => o.isCorrect);
-      const wrongOpt = q?.options.find(o => !o.isCorrect);
-      selectedOptionId = optionOrCorrect ? (correctOpt?.id ?? 1) : (wrongOpt?.id ?? 2);
-    } else {
-      selectedOptionId = optionOrCorrect;
-    }
-
     const mode: ActivityMode = context?.mode || 'practice';
     const updated = await recordAttempt({
       questionId,
       selectedOptionId,
       mode,
       sessionId: context?.sessionId,
-      examId: context?.examId,
-      isCorrectHint
+      examId: context?.examId
     });
 
-    // Reactive state patch: Cập nhật ngay progressMap mà không phải refetch full DB
     setProgressMap(prev => {
       const next = new Map(prev);
       next.set(questionId, updated);
@@ -229,7 +217,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Exam actions
   const startRandomExam = () => {
     const qIds = generateExam(profile, questions);
     const newSession: ActiveExamSession = {
@@ -254,6 +241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       examId: `fixed_exam_${examNumber}_${Date.now()}`,
       profileId: profile.id,
       title: `Đề luyện chuẩn số ${examNumber}/18`,
+      fixedExamNumber: examNumber,
       questionBankVersionId: profile.questionBankVersionId,
       questionIds: qIds,
       startedAt: new Date().toISOString(),
@@ -281,7 +269,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const submitExam = async () => {
     if (!activeSession) return;
-    const isFixed = activeSession.examId.startsWith('fixed_');
+    const isFixed = activeSession.fixedExamNumber !== undefined || activeSession.examId.startsWith('fixed_');
     const resultRecord = await submitExamAtomically({
       activeSession,
       profile,
@@ -290,15 +278,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       examType: isFixed ? 'fixed' : 'random'
     });
 
-    // Refresh progress & history sau bài thi
-    const allProgress = await db.progress.toArray();
-    const pMap = new Map<string, UserProgressItem>();
-    for (const p of allProgress) pMap.set(p.questionId, p);
-    setProgressMap(pMap);
-
-    const history = await db.examHistory.toArray();
-    setExamHistory(history.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()));
-
+    await reloadGlobalStateFromDb();
     setActiveSession(null);
     setSelectedExamResult(resultRecord);
     setCurrentView('result');
@@ -324,33 +304,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllProgress = async () => {
-    await db.progress.clear();
-    await db.examHistory.clear();
-    await db.activeSession.clear();
+    await db.transaction(
+      'rw',
+      [db.progress, db.examHistory, db.activeSession, db.cramSessions, db.attempts],
+      async () => {
+        await db.progress.clear();
+        await db.examHistory.clear();
+        await db.activeSession.clear();
+        await db.cramSessions.clear();
+        await db.attempts.clear();
+      }
+    );
     setProgressMap(new Map());
     setExamHistory([]);
     setActiveSession(null);
+    setCramSession(null);
+    setSelectedExamResult(null);
     setCurrentView('dashboard');
   };
 
   const exportBackup = async () => {
-    const allProgress = await db.progress.toArray();
+    const [allProgress, history, attempts, cramSessions] = await Promise.all([
+      db.progress.toArray(),
+      db.examHistory.toArray(),
+      db.attempts.toArray(),
+      db.cramSessions.toArray()
+    ]);
+
     const progressRecord: Record<string, UserProgressItem> = {};
     const bookmarks: string[] = [];
     for (const p of allProgress) {
       progressRecord[p.questionId] = p;
       if (p.isBookmarked) bookmarks.push(p.questionId);
     }
-    const history = await db.examHistory.toArray();
-    const attempts = await db.attempts.toArray();
 
     const backupData: BackupData = {
       schemaVersion: 2,
-      appVersion: '1.2.0',
+      appVersion: '1.3.0',
       exportedAt: new Date().toISOString(),
       progress: progressRecord,
       examHistory: history,
       attempts,
+      cramSessions,
       bookmarks,
       settings: {
         darkMode
@@ -368,12 +363,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const importBackup = async (jsonString: string): Promise<{ success: boolean; message: string }> => {
     try {
-      // 1. Giới hạn kích thước payload (tối đa 5MB)
       if (typeof jsonString !== 'string' || jsonString.length > 5 * 1024 * 1024) {
         return { success: false, message: 'Dung lượng file sao lưu vượt quá giới hạn cho phép (tối đa 5MB).' };
       }
 
-      // 2. Safe JSON parse
       let rawData: unknown;
       try {
         rawData = JSON.parse(jsonString);
@@ -388,7 +381,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const data = rawData as Record<string, unknown>;
 
-      // 3. Structural validation (Type Guards)
       if (data.schemaVersion !== 1 && data.schemaVersion !== 2) {
         return { success: false, message: 'Phiên bản schema sao lưu không được hỗ trợ (chỉ hỗ trợ v1 và v2).' };
       }
@@ -401,18 +393,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return { success: false, message: 'Dữ liệu lịch sử thi (examHistory) không phải dạng danh sách.' };
       }
 
-      // Validate từng phần tử progress
+      const bookmarkSet = new Set<string>(
+        Array.isArray(data.bookmarks)
+          ? data.bookmarks.filter((b): b is string => typeof b === 'string')
+          : []
+      );
+
       const progressEntries = Object.values(data.progress as Record<string, unknown>);
       const validProgressItems: UserProgressItem[] = [];
       for (const item of progressEntries) {
         if (!item || typeof item !== 'object') continue;
         const p = item as Record<string, unknown>;
         if (typeof p.questionId === 'string' && p.questionId.length > 0) {
-          validProgressItems.push(item as UserProgressItem);
+          const progItem = item as UserProgressItem;
+          if (bookmarkSet.has(progItem.questionId)) {
+            progItem.isBookmarked = true;
+          }
+          validProgressItems.push(progItem);
         }
       }
 
-      // Validate từng phần tử examHistory
       const validExamHistory: ExamRecord[] = [];
       for (const exam of data.examHistory) {
         if (!exam || typeof exam !== 'object') continue;
@@ -422,7 +422,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // Validate attempts (nếu có ở schemaVersion 2)
       const validAttempts: AttemptRecord[] = [];
       if (Array.isArray(data.attempts)) {
         for (const att of data.attempts) {
@@ -434,35 +433,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
 
-      // 4. Chỉ dọn dẹp và ghi DB sau khi đã xác thực cấu trúc hợp lệ 100%
-      await db.transaction('rw', db.progress, db.examHistory, db.attempts, async () => {
-        await db.progress.clear();
-        await db.examHistory.clear();
-        await db.attempts.clear();
-
-        if (validProgressItems.length > 0) {
-          await db.progress.bulkPut(validProgressItems);
+      const validCramSessions: CramSession[] = [];
+      if (Array.isArray(data.cramSessions)) {
+        for (const cs of data.cramSessions) {
+          if (!cs || typeof cs !== 'object') continue;
+          const c = cs as Record<string, unknown>;
+          if (typeof c.id === 'string' && c.mode === 'cram-120') {
+            validCramSessions.push(cs as CramSession);
+          }
         }
-        if (validExamHistory.length > 0) {
-          await db.examHistory.bulkPut(validExamHistory);
-        }
-        if (validAttempts.length > 0) {
-          await db.attempts.bulkPut(validAttempts);
-        }
-      });
+      }
 
-      // 5. Đồng bộ lại state bộ nhớ
-      const allProgress = await db.progress.toArray();
-      const pMap = new Map<string, UserProgressItem>();
-      for (const p of allProgress) pMap.set(p.questionId, p);
-      setProgressMap(pMap);
+      await db.transaction(
+        'rw',
+        [db.progress, db.examHistory, db.attempts, db.cramSessions, db.activeSession],
+        async () => {
+          await db.progress.clear();
+          await db.examHistory.clear();
+          await db.attempts.clear();
+          await db.cramSessions.clear();
+          await db.activeSession.clear();
 
-      const history = await db.examHistory.toArray();
-      setExamHistory(history.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()));
+          if (validProgressItems.length > 0) await db.progress.bulkPut(validProgressItems);
+          if (validExamHistory.length > 0) await db.examHistory.bulkPut(validExamHistory);
+          if (validAttempts.length > 0) await db.attempts.bulkPut(validAttempts);
+          if (validCramSessions.length > 0) await db.cramSessions.bulkPut(validCramSessions);
+        }
+      );
+
+      if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
+        const s = data.settings as Record<string, unknown>;
+        if (typeof s.darkMode === 'boolean') {
+          setDarkMode(s.darkMode);
+        }
+      }
+
+      await reloadGlobalStateFromDb();
+      setActiveSession(null);
+      const activeCram = await loadActiveCramSession();
+      setCramSession(activeCram && activeCram.status === 'active' ? activeCram : null);
 
       return {
         success: true,
-        message: `Khôi phục thành công ${validProgressItems.length} tiến độ câu hỏi, ${validAttempts.length} lịch sử attempts và ${validExamHistory.length} bài thi!`
+        message: `Khôi phục thành công ${validProgressItems.length} tiến độ câu hỏi, ${validAttempts.length} lượt trả lời và ${validExamHistory.length} bài thi!`
       };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -482,20 +495,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateCramSession = async (updated: CramSession) => {
-    setCramSession(updated);
-    if (updated.status === 'abandoned') {
-      setCramSession(null);
-    }
-    // Tự động đồng bộ examHistory và progressMap từ Dexie để toàn bộ ứng dụng cập nhật
+    setCramSession(updated.status === 'abandoned' ? null : updated);
     try {
-      const [history, allProgress] = await Promise.all([
-        db.examHistory.toArray(),
-        db.progress.toArray()
-      ]);
-      setExamHistory(history.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()));
-      const pMap = new Map<string, UserProgressItem>();
-      for (const p of allProgress) pMap.set(p.questionId, p);
-      setProgressMap(pMap);
+      await reloadGlobalStateFromDb();
     } catch (err) {
       console.warn('Lỗi khi đồng bộ examHistory/progressMap:', err);
     }

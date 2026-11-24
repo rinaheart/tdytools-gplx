@@ -16,6 +16,7 @@ import type {
 } from '../types/cram';
 import { db } from '../db/dexie';
 import { getQuestionsNeedingReview, calculateReadinessMetrics } from './learningEngine';
+import { createSeededRandom, shuffleArray } from './examEngine';
 
 export const DEFAULT_CRAM_BUDGET: CramBudget = {
   criticalTriage: 900,  // 15 phút
@@ -28,10 +29,6 @@ export const DEFAULT_CRAM_BUDGET: CramBudget = {
   total: 7200           // 120 phút (Invariant)
 };
 
-/**
- * Khởi tạo phiên Cấp Tốc 120 phút với wall-clock deadline thực, seed tái lập được
- * và snapshot Baseline trước khi thực hiện attempt đầu tiên của phiên.
- */
 export function startCramSession(
   profile: ExamProfile,
   questions: Question[],
@@ -41,17 +38,13 @@ export function startCramSession(
 ): CramSession {
   const now = new Date();
   const startedAt = now.toISOString();
-  // 120 phút = 7200 giây
   const deadlineAt = new Date(now.getTime() + 7200 * 1000).toISOString();
 
   const sessionSeed = seed ?? Math.floor(Math.random() * 1000000);
   const exam1Seed = sessionSeed + 1;
   const exam2Seed = sessionSeed + 2;
 
-  // Lấy danh sách 60 câu điểm liệt
   const criticalQuestions = questions.filter(q => q.isCritical);
-
-  // Chụp ảnh snapshot Baseline tại thời điểm bắt đầu phiên
   const pMap = progressMap || new Map<string, UserProgressItem>();
   const eHist = examHistory || [];
 
@@ -63,11 +56,9 @@ export function startCramSession(
     q => pMap.get(q.id)?.status === 'mastered'
   ).length;
 
-  const reviewCount = getQuestionsNeedingReview(questions, pMap).length;
-
+  const reviewCount = getQuestionsNeedingReview(questions, pMap, true).length;
   const globalReadiness = calculateReadinessMetrics(questions, pMap, eHist);
 
-  // Map rating sang CramReadinessLevel
   let readinessLevel: CramReadinessLevel = 'not-ready';
   if (globalReadiness.rating === 'MỨC ĐỘ SẴN SÀNG: CAO') readinessLevel = 'high';
   else if (globalReadiness.rating === 'GẦN SẴN SÀNG') readinessLevel = 'good';
@@ -87,6 +78,7 @@ export function startCramSession(
     profileId: profile.id,
     status: 'active',
     currentStage: 'critical-triage',
+    stageCursor: 0,
     startedAt,
     deadlineAt,
     baseline,
@@ -107,43 +99,48 @@ export function startCramSession(
   };
 }
 
-/**
- * Tạm dừng phiên ôn tập (Freeze countdown)
- */
 export function pauseCramSession(session: CramSession): CramSession {
   if (session.isPaused || session.status !== 'active') return session;
+  const nowIso = new Date().toISOString();
   return {
     ...session,
     isPaused: true,
-    pausedAt: new Date().toISOString()
+    pausedAt: nowIso,
+    activeCramExam: session.activeCramExam
+      ? { ...session.activeCramExam, pausedAt: nowIso }
+      : undefined
   };
 }
 
-/**
- * Tiếp tục phiên ôn tập sau khi tạm dừng (Cộng dời deadlineAt tương ứng thời gian tạm dừng)
- */
 export function resumeCramSession(session: CramSession): CramSession {
   if (!session.isPaused || !session.pausedAt || session.status !== 'active') return session;
 
-  const pausedTime = new Date(session.pausedAt).getTime();
   const nowTime = Date.now();
-  const pausedDurationSeconds = Math.max(0, Math.floor((nowTime - pausedTime) / 1000));
+  const pausedDurationSeconds = Math.max(0, Math.floor((nowTime - new Date(session.pausedAt).getTime()) / 1000));
+  const newDeadlineAt = new Date(new Date(session.deadlineAt).getTime() + pausedDurationSeconds * 1000).toISOString();
 
-  const currentDeadline = new Date(session.deadlineAt).getTime();
-  const newDeadlineAt = new Date(currentDeadline + pausedDurationSeconds * 1000).toISOString();
+  let updatedExam = session.activeCramExam;
+  if (updatedExam) {
+    const examPauseSec = updatedExam.pausedAt
+      ? Math.max(0, Math.floor((nowTime - new Date(updatedExam.pausedAt).getTime()) / 1000))
+      : pausedDurationSeconds;
+    updatedExam = {
+      ...updatedExam,
+      pausedAt: undefined,
+      totalPausedSeconds: updatedExam.totalPausedSeconds + examPauseSec
+    };
+  }
 
   return {
     ...session,
     isPaused: false,
     pausedAt: undefined,
     totalPausedSeconds: session.totalPausedSeconds + pausedDurationSeconds,
-    deadlineAt: newDeadlineAt
+    deadlineAt: newDeadlineAt,
+    activeCramExam: updatedExam
   };
 }
 
-/**
- * Lưu phiên vào Dexie (Source of truth)
- */
 export async function saveCramSession(session: CramSession): Promise<void> {
   try {
     await db.cramSessions.put(session);
@@ -152,9 +149,6 @@ export async function saveCramSession(session: CramSession): Promise<void> {
   }
 }
 
-/**
- * Tải phiên Cấp tốc đang chạy từ Dexie
- */
 export async function loadActiveCramSession(): Promise<CramSession | null> {
   try {
     const activeSessions = await db.cramSessions
@@ -164,19 +158,14 @@ export async function loadActiveCramSession(): Promise<CramSession | null> {
 
     if (activeSessions.length === 0) return null;
 
-    // Lấy phiên gần nhất
     const session = activeSessions.sort(
       (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
     )[0];
 
-    // Kiểm tra xem đã quá deadline thực chưa (nếu không đang pause)
-    if (!session.isPaused) {
-      const isExpired = Date.now() > new Date(session.deadlineAt).getTime();
-      if (isExpired) {
-        session.status = 'expired';
-        session.completedAt = new Date().toISOString();
-        await db.cramSessions.put(session);
-      }
+    if (!session.isPaused && Date.now() > new Date(session.deadlineAt).getTime()) {
+      session.status = 'expired';
+      session.completedAt = new Date().toISOString();
+      await db.cramSessions.put(session);
     }
 
     return session;
@@ -186,9 +175,6 @@ export async function loadActiveCramSession(): Promise<CramSession | null> {
   }
 }
 
-/**
- * Hủy bỏ phiên ôn tập
- */
 export async function abandonCramSession(session: CramSession): Promise<void> {
   const updated: CramSession = {
     ...session,
@@ -198,9 +184,6 @@ export async function abandonCramSession(session: CramSession): Promise<void> {
   await saveCramSession(updated);
 }
 
-/**
- * Lấy ngân sách thời gian mục tiêu (giây) của từng giai đoạn
- */
 export function getStageBudgetSeconds(budget: CramBudget, stage: CramStage): number {
   switch (stage) {
     case 'critical-triage':
@@ -222,33 +205,23 @@ export function getStageBudgetSeconds(budget: CramBudget, stage: CramStage): num
   }
 }
 
-/**
- * Chuyển sang giai đoạn tiếp theo và tái tính toán adaptive budget cho 80 phút non-exam
- */
 export function advanceCramStage(
   session: CramSession,
   nextStage: CramStage,
   actualStageElapsedSeconds?: number
 ): CramSession {
   const now = new Date().toISOString();
-
-  // Tạo bản sao budget
   const newBudget = { ...session.budget };
 
-  // Nếu stage trước hoàn thành sớm hơn dự kiến, chuyển phần dư sang Weakness Sprint hoặc Final Check
   if (actualStageElapsedSeconds !== undefined) {
     const plannedSeconds = getStageBudgetSeconds(session.budget, session.currentStage);
     const savedSeconds = plannedSeconds - actualStageElapsedSeconds;
 
-    // Chỉ tái phân bổ cho các stage non-exam (tổng 4800s không vượt quá)
-    if (savedSeconds > 0 && session.currentStage !== 'exam-1' && session.currentStage !== 'exam-2') {
-      if (session.currentStage === 'critical-triage' || session.currentStage === 'critical-repair') {
-        newBudget.weaknessSprint = Math.min(2400, newBudget.weaknessSprint + savedSeconds);
-      }
+    if (savedSeconds > 0 && (session.currentStage === 'critical-triage' || session.currentStage === 'critical-repair')) {
+      newBudget.weaknessSprint = Math.min(2400, newBudget.weaknessSprint + savedSeconds);
     }
   }
 
-  // Bảo đảm bất biến tuyệt đối:
   newBudget.exam1 = 1200;
   newBudget.exam2 = 1200;
   newBudget.total = 7200;
@@ -256,21 +229,20 @@ export function advanceCramStage(
   return {
     ...session,
     currentStage: nextStage,
+    stageCursor: 0,
+    activeCramExam: undefined,
     stageStartedAt: now,
     budget: newBudget
   };
 }
 
-/**
- * Phân tích kết quả bài thi thử theo từng nhóm chủ đề
- */
 export function analyzeExamRecord(
   record: ExamRecord,
   questions: Question[]
 ): ExamAnalysisResult {
   const questionMap = new Map(questions.map(q => [q.id, q]));
 
-  const categoryCategories: Question['category'][] = [
+  const categoryList: Question['category'][] = [
     'rules',
     'culture',
     'drivingTechnique',
@@ -308,8 +280,7 @@ export function analyzeExamRecord(
     }
   }
 
-  // Tính accuracy từng nhóm
-  for (const cat of categoryCategories) {
+  for (const cat of categoryList) {
     const item = byCategory[cat];
     item.accuracy = item.total > 0 ? Math.round((item.correct / item.total) * 100) : 100;
   }
@@ -326,122 +297,102 @@ export function analyzeExamRecord(
 }
 
 /**
- * Xây dựng danh sách câu hỏi ưu tiên theo từng giai đoạn của phiên cấp tốc
+ * Tuyển chọn danh sách 20 câu hỏi cho Weakness Sprint dựa trên đúng các nhóm yếu từ FailureAnalysisStage.
  */
-export function buildCramQueue(
-  stage: CramStage,
-  session: CramSession,
+export function selectWeaknessSprintIds(
   questions: Question[],
   progressMap: Map<string, UserProgressItem>,
-  _examHistory: ExamRecord[]
+  exam1MistakeIds: string[],
+  weakCategories: Question['category'][],
+  seed: number
+): string[] {
+  const rng = createSeededRandom(seed + 500);
+  const selected = new Set<string>(exam1MistakeIds);
+  const weakSet = new Set<Question['category']>(
+    weakCategories.length > 0 ? weakCategories : ['signs', 'scenario']
+  );
+
+  // 1. Ưu tiên các câu đang ở trạng thái 'review' thuộc nhóm yếu
+  for (const q of questions) {
+    if (selected.size >= 25) break;
+    if (weakSet.has(q.category) && progressMap.get(q.id)?.status === 'review') {
+      selected.add(q.id);
+    }
+  }
+
+  // 2. Bổ sung câu 'review' ở các nhóm còn lại nếu chưa đủ 20 câu
+  if (selected.size < 20) {
+    for (const q of questions) {
+      if (selected.size >= 20) break;
+      if (progressMap.get(q.id)?.status === 'review') {
+        selected.add(q.id);
+      }
+    }
+  }
+
+  // 3. Điền đủ tối thiểu 20 câu bằng câu chưa thành thạo trong các nhóm yếu (xáo trộn bằng seeded RNG)
+  if (selected.size < 20) {
+    const pool = shuffleArray(
+      questions.filter(
+        q => weakSet.has(q.category) && !selected.has(q.id) && progressMap.get(q.id)?.status !== 'mastered'
+      ),
+      rng
+    );
+    for (const q of pool) {
+      selected.add(q.id);
+      if (selected.size >= 20) break;
+    }
+  }
+
+  return Array.from(selected);
+}
+
+/**
+ * Xây dựng danh sách câu hỏi thực thi cho 4 stage luyện tập của Cram 120 (Single Source of Truth).
+ */
+export function getCramDrillQuestions(
+  stage: 'critical-triage' | 'critical-repair' | 'weakness-sprint' | 'final-check',
+  session: CramSession,
+  questions: Question[],
+  progressMap: Map<string, UserProgressItem>
 ): Question[] {
   const questionMap = new Map(questions.map(q => [q.id, q]));
 
   switch (stage) {
-    case 'critical-triage': {
-      // Toàn bộ 60 câu điểm liệt
+    case 'critical-triage':
       return questions.filter(q => q.isCritical);
-    }
 
     case 'critical-repair': {
-      // 1. Câu sai từ triage vừa xong
-      // 2. Câu điểm liệt từng làm sai trong lịch sử học
-      const mistakeIds = new Set<string>(session.triageMistakeIds);
-
-      for (const q of questions) {
-        if (q.isCritical) {
-          const prog = progressMap.get(q.id);
-          if (prog && (prog.status === 'review' || prog.incorrectCount > 0) && prog.status !== 'mastered') {
-            mistakeIds.add(q.id);
-          }
-        }
-      }
-
-      // Nếu không có câu sai nào, vẫn đưa 10 câu điểm liệt tiêu biểu để rà soát
-      if (mistakeIds.size === 0) {
-        return questions.filter(q => q.isCritical).slice(0, 15);
-      }
-
-      return Array.from(mistakeIds)
-        .map(id => questionMap.get(id))
-        .filter((q): q is Question => q !== undefined);
+      const ids = session.triageMistakeIds.length > 0
+        ? session.triageMistakeIds
+        : questions
+            .filter(q => q.isCritical && progressMap.get(q.id)?.status === 'review')
+            .map(q => q.id);
+      return ids.map(id => questionMap.get(id)).filter((q): q is Question => q !== undefined);
     }
 
     case 'weakness-sprint': {
-      // Ưu tiên câu sai từ Exam 1 + các câu thuộc nhóm có tỷ lệ sai cao nhất
-      const targetIds = new Set<string>(session.exam1MistakeIds);
-
-      // Bổ sung các câu trong weakQuestionIds nếu có
-      for (const id of session.weakQuestionIds) {
-        targetIds.add(id);
-      }
-
-      // Nếu số lượng câu < 20, lấy thêm các câu đang ở trạng thái 'review' từ ngân hàng câu
-      if (targetIds.size < 20) {
-        for (const [qId, prog] of progressMap.entries()) {
-          if (prog.status === 'review') {
-            targetIds.add(qId);
-            if (targetIds.size >= 25) break;
-          }
-        }
-      }
-
-      // Fallback nếu người dùng học quá tốt: lấy các câu tình huống và biển báo quan trọng
-      if (targetIds.size === 0) {
-        const fallback = questions.filter(q => q.category === 'signs' || q.category === 'scenario').slice(0, 20);
-        return fallback;
-      }
-
-      return Array.from(targetIds)
-        .map(id => questionMap.get(id))
-        .filter((q): q is Question => q !== undefined);
+      const ids = session.weakQuestionIds.length > 0
+        ? session.weakQuestionIds
+        : selectWeaknessSprintIds(questions, progressMap, session.exam1MistakeIds, [], session.sessionSeed);
+      return ids.map(id => questionMap.get(id)).filter((q): q is Question => q !== undefined);
     }
 
     case 'final-check': {
-      // Remediation-only:
-      // 1. Critical questions chưa mastered
-      // 2. Questions sai trong Exam 2
-      // 3. Questions sai trong Exam 1
-      const checkIds = new Set<string>();
-
-      // Câu sai Exam 2
-      for (const id of session.exam2MistakeIds) {
-        checkIds.add(id);
+      const ids = new Set<string>([
+        ...session.exam2MistakeIds,
+        ...session.exam1MistakeIds,
+        ...session.criticalRepairRemainingIds
+      ]);
+      if (ids.size === 0) {
+        const rng = createSeededRandom(session.sessionSeed + 900);
+        return shuffleArray(questions.filter(q => q.isCritical), rng).slice(0, 10);
       }
-
-      // Câu sai Exam 1
-      for (const id of session.exam1MistakeIds) {
-        checkIds.add(id);
-      }
-
-      // Câu điểm liệt chưa an toàn
-      for (const q of questions) {
-        if (q.isCritical) {
-          const prog = progressMap.get(q.id);
-          if (prog && prog.status !== 'mastered') {
-            checkIds.add(q.id);
-          }
-        }
-      }
-
-      // Nếu sạch lỗi: lấy 10 câu điểm liệt quan trọng nhất để xác nhận lần cuối
-      if (checkIds.size === 0) {
-        return questions.filter(q => q.isCritical).slice(0, 10);
-      }
-
-      return Array.from(checkIds)
-        .map(id => questionMap.get(id))
-        .filter((q): q is Question => q !== undefined);
+      return Array.from(ids).map(id => questionMap.get(id)).filter((q): q is Question => q !== undefined);
     }
-
-    default:
-      return [];
   }
 }
 
-/**
- * Tính toán mức độ sẵn sàng (Readiness) sau khi kết thúc phiên Cấp Tốc 120 phút
- */
 export function calculateCramReadiness(
   session: CramSession,
   exam1Record?: ExamRecord,
@@ -457,29 +408,19 @@ export function calculateCramReadiness(
   let summaryText = '';
   let nextActionRecommendation = '';
 
-  // Rule 1: HIGH
-  // exam2Score >= 28 && criticalFinalErrors === 0 && criticalRepairRemaining === 0
   if ((exam2Score ?? 0) >= 28 && exam2Passed && criticalFinalErrors === 0 && criticalRepairRemaining === 0) {
     level = 'high';
-    summaryText = 'Bạn đã triệt tiêu hoàn toàn rủi ro câu điểm liệt và đạt kết quả xuất sắc ở cả 2 bài thi thử.';
+    summaryText = 'Bạn đã triệt tiêu hoàn toàn rủi ro câu điểm liệt và đạt kết quả xuất sắc ở bài thi kiểm chứng.';
     nextActionRecommendation = 'Bạn đang ở trạng thái sẵn sàng cao. Thi thêm 1 đề ngẫu nhiên để duy trì cảm giác làm bài thi.';
-  }
-  // Rule 2: GOOD
-  // exam2Score >= 27 && exam2Passed && criticalFinalErrors === 0
-  else if ((exam2Score ?? 0) >= 27 && exam2Passed && criticalFinalErrors === 0) {
+  } else if ((exam2Score ?? 0) >= 27 && exam2Passed && criticalFinalErrors === 0) {
     level = 'good';
     summaryText = 'Bạn đạt điểm đỗ ở bài thi kiểm chứng và không có lỗi câu điểm liệt ở khâu kiểm tra an toàn cuối cùng.';
     nextActionRecommendation = 'Bạn đã đạt mức khá ổn. Khuyến nghị ôn lại các câu còn phân vân trước giờ thi.';
-  }
-  // Rule 3: BORDERLINE
-  // exam2Score >= 27 && (criticalFinalErrors > 0 || criticalRepairRemaining > 0)
-  else if ((exam2Score ?? 0) >= 27) {
+  } else if ((exam2Score ?? 0) >= 27) {
     level = 'borderline';
-    summaryText = 'Bạn đạt điểm số chuẩn (≥27/30) nhưng vẫn còn tiềm ẩn rủi ro ở câu điểm liệt.';
+    summaryText = 'Bạn đạt điểm số chuẩn (≥ 27/30) nhưng vẫn còn tiềm ẩn rủi ro ở câu điểm liệt.';
     nextActionRecommendation = 'Đạt điểm số nhưng chưa an toàn tuyệt đối. Cần ôn ngay lại toàn bộ các câu điểm liệt vừa sai.';
-  }
-  // Rule 4: NOT READY
-  else {
+  } else {
     level = 'not-ready';
     summaryText = 'Chưa đạt yêu cầu tối thiểu (điểm thi < 27 hoặc còn sai câu điểm liệt nghiêm trọng).';
     nextActionRecommendation = 'Chưa nên vội thi thật. Hãy tập trung luyện riêng mục "Câu sai" và 60 câu điểm liệt.';

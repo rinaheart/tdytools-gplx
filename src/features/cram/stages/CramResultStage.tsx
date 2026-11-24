@@ -47,7 +47,7 @@ export const CramResultStage: React.FC<CramResultStageProps> = ({
   }, [questions, progressMap]);
 
   const currentReviewCount = useMemo(() => {
-    return getQuestionsNeedingReview(questions, progressMap).length;
+    return getQuestionsNeedingReview(questions, progressMap, true).length;
   }, [questions, progressMap]);
 
   // Cấu hình nhãn mức độ sẵn sàng (Tuân thủ Purple Ban: không dùng tím)

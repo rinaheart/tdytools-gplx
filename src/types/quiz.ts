@@ -1,3 +1,5 @@
+import type { CramSession } from './cram';
+
 export interface Option {
   id: number;
   text: string;
@@ -18,8 +20,7 @@ export interface Question {
   };
   options: Option[];
   isCritical: boolean;
-  criticalSetId?: string; // Bắt buộc tồn tại khi isCritical === true
-  explanation?: string;
+  criticalSetId?: string;
   source: {
     document: string;
     page: number;
@@ -61,28 +62,22 @@ export interface ExamProfile {
   passingScore: number;
   criticalQuestionCount?: number;
   criticalMistakeFails?: boolean;
-  blueprint?: ExamBlueprintSlot[]; // Optional khi status là placeholder
+  blueprint?: ExamBlueprintSlot[];
 }
 
 export interface ExamModePolicy {
   showCriticalBadge: boolean;
   showExplanation: boolean;
-  allowRetry: boolean;
-  showCorrectAnswerAfterSubmit: boolean;
 }
 
 export const PRACTICE_MODE_POLICY: ExamModePolicy = {
   showCriticalBadge: true,
-  showExplanation: true,
-  allowRetry: true,
-  showCorrectAnswerAfterSubmit: true
+  showExplanation: true
 };
 
 export const EXAM_MODE_POLICY: ExamModePolicy = {
   showCriticalBadge: false, // Blind-to-critical: Giấu hoàn toàn nhãn điểm liệt khi thi thử
-  showExplanation: false,
-  allowRetry: false,
-  showCorrectAnswerAfterSubmit: true
+  showExplanation: false
 };
 
 export type QuestionStatus = 'unseen' | 'learning' | 'review' | 'mastered';
@@ -105,11 +100,12 @@ export interface ActiveExamSession {
   examId: string;
   profileId: string;
   title: string;
+  fixedExamNumber?: number;
   questionBankVersionId: string;
   questionIds: string[];
   startedAt: string;
   allocatedDurationSeconds: number;
-  answers: Record<string, number | undefined>; // questionId -> selectedOptionId
+  answers: Record<string, number | undefined>;
   isSubmitted: boolean;
 }
 
@@ -135,11 +131,12 @@ export interface ExamRecord {
   id: string;
   profileId: string;
   title: string;
+  fixedExamNumber?: number;
   mode?: 'exam' | 'cram-120';
   examType?: 'random' | 'fixed';
   questionBankVersionId: string;
   profileSnapshot: ProfileSnapshot;
-  questionIds: string[]; // Tái hiện 100% đề thi cũ
+  questionIds: string[];
   generatedAt: string;
   startedAt: string;
   completedAt: string;
@@ -167,6 +164,7 @@ export interface BackupData {
   progress: Record<string, UserProgressItem>;
   examHistory: ExamRecord[];
   attempts?: AttemptRecord[];
+  cramSessions?: CramSession[];
   bookmarks: string[];
   settings: Record<string, unknown>;
 }
@@ -177,9 +175,7 @@ export type LearningStage =
   | 'topic-reinforcement'
   | 'fixed-exams'
   | 'random-exams'
-  | 'full-scan'
-  | 'speed-training'
-  | 'ready';
+  | 'speed-training';
 
 export interface NextBestAction {
   stage: LearningStage;

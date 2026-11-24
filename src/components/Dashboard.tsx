@@ -15,6 +15,8 @@ import {
   Zap
 } from 'lucide-react';
 import { CramIntroModal } from '../features/cram/stages/CramIntroModal';
+import { getQuestionsNeedingReview } from '../services/learningEngine';
+import { getFixedExamNumber } from '../services/examEngine';
 
 export const Dashboard: React.FC = () => {
   const {
@@ -48,14 +50,12 @@ export const Dashboard: React.FC = () => {
     q => progressMap.get(q.id)?.status === 'mastered'
   ).length;
 
-  // Review count
-  const reviewCount = questions.filter(
-    q => progressMap.get(q.id)?.status === 'review'
-  ).length;
+  // Review count (đồng bộ 100% với Sidebar & ReviewQueueView)
+  const reviewCount = getQuestionsNeedingReview(questions, progressMap).length;
 
   // Fixed exams completed count
   const fixedHistoryCount = new Set(
-    examHistory.filter(e => e.title.startsWith('Đề luyện chuẩn')).map(e => e.title)
+    examHistory.map(e => getFixedExamNumber(e)).filter((n): n is number => n !== null)
   ).size;
 
   // Handler for Next Best Action button

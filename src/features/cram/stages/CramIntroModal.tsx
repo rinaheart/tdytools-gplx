@@ -52,7 +52,7 @@ export const CramIntroModal: React.FC<CramIntroModalProps> = ({ onStart, onCance
             <div className="flex items-start gap-2.5">
               <span className="w-5 h-5 rounded-full bg-rose-500/15 text-rose-600 dark:text-rose-400 font-bold flex items-center justify-center flex-shrink-0 text-[10px]">2</span>
               <div>
-                <strong className="text-slate-800 dark:text-slate-200">Sửa lỗi điểm liệt (20p):</strong> Học giải thích sâu các câu trả lời sai.
+                <strong className="text-slate-800 dark:text-slate-200">Sửa lỗi điểm liệt (20p):</strong> Làm lại và ghi nhớ chính xác đáp án đúng các câu vừa sai.
               </div>
             </div>
 

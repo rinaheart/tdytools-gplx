@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import confetti from 'canvas-confetti';
 import {
   AlertTriangle,
   Award,
@@ -17,11 +16,15 @@ export const ExamResultView: React.FC = () => {
 
   useEffect(() => {
     if (selectedExamResult?.passed) {
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+      import('canvas-confetti')
+        .then(mod => {
+          mod.default({
+            particleCount: 80,
+            spread: 70,
+            origin: { y: 0.6 }
+          });
+        })
+        .catch(() => {});
     }
   }, [selectedExamResult]);
 

@@ -2,7 +2,6 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
@@ -11,12 +10,20 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'dexie', 'canvas-confetti', 'lucide-react']
+        manualChunks(id) {
+          const normalized = id.replace(/\\/g, '/');
+          if (normalized.includes('/data/questions.json')) {
+            return 'questions-data';
+          }
+          if (normalized.includes('/node_modules/')) {
+            if (normalized.includes('/canvas-confetti/')) {
+              return 'confetti';
+            }
+            return 'vendor';
+          }
         }
       }
-    },
-    chunkSizeWarningLimit: 800
+    }
   },
   server: {
     port: 3000,

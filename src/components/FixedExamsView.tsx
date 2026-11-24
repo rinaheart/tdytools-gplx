@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { getFixedExamNumber } from '../services/examEngine';
 import {
   Award,
   CheckCircle2,
@@ -18,12 +19,11 @@ export const FixedExamsView: React.FC<FixedExamsViewProps> = ({ onBack }) => {
   const totalExams = 18;
   const examItems = Array.from({ length: totalExams }, (_, i) => i + 1);
 
-  // Group history by fixed exam title
+  // Group history by fixed exam number (tương thích cả bản ghi cũ & mới)
   const fixedHistoryMap = new Map<number, (typeof examHistory)[0]>();
   for (const record of examHistory) {
-    const m = record.title.match(/Đề luyện chuẩn số (\d+)\/18/);
-    if (m) {
-      const num = parseInt(m[1], 10);
+    const num = getFixedExamNumber(record);
+    if (num !== null) {
       const existing = fixedHistoryMap.get(num);
       if (!existing || record.score > existing.score) {
         fixedHistoryMap.set(num, record);
